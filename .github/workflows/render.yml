@@ -1,0 +1,66 @@
+name: Render calendar
+
+on:
+  schedule:
+    - cron: "5 16 * * *"   # 00:05 Asia/Shanghai, new day
+    - cron: "0 * * * *"    # hourly refresh (footer time, safety net)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write   # keepalive commit, so GitHub never disables the schedule after 60 idle days
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Fetch Noto Sans CJK SC
+        uses: actions/cache@v4
+        id: fontcache
+        with:
+          path: fonts
+          key: noto-cjk-sc-v1
+      - if: steps.fontcache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p fonts
+          curl -fsSL -o fonts/NotoSansCJKsc-Regular.otf https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf
+          curl -fsSL -o fonts/NotoSansCJKsc-Bold.otf    https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf
+      - run: python render.py --out site/calendar.png
+      - run: cp site/calendar.png site/index.png && printf '<img src="calendar.png">' > site/index.html
+      - name: Keepalive commit (once every 30 days)
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          if [ $(( (now - last) / 86400 )) -ge 30 ]; then
+            git config user.name github-actions
+            git config user.email github-actions@github.com
+            date -u +%FT%TZ > .keepalive
+            git add .keepalive && git commit -m "keepalive" && git push
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

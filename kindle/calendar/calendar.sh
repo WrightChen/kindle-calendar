@@ -1,0 +1,92 @@
+#!/bin/sh
+# Kindle-side dashboard loop: fetch calendar.png, draw it, sleep, repeat.
+# Lives in /mnt/us/calendar/. Started by Calendar-Start.sh, stopped by Calendar-Stop.sh.
+
+DIR=/mnt/us/calendar
+. "$DIR/config.sh"
+LOG="$DIR/calendar.log"
+
+log() { echo "$(date '+%m-%d %H:%M:%S') $*" >>"$LOG"; }
+
+# keep the log small
+[ -f "$LOG" ] && [ "$(wc -c <"$LOG")" -gt 200000 ] && tail -c 50000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+
+log "=== calendar.sh starting (interval ${INTERVAL}m, url $IMAGE_URL)"
+
+# Take over the screen: stop the Kindle UI, keep the device awake, keep Wi-Fi on.
+/etc/init.d/framework stop >/dev/null 2>&1
+initctl stop webreader >/dev/null 2>&1
+lipc-set-prop com.lab126.powerd preventScreenSaver 1
+lipc-set-prop com.lab126.cmd wirelessEnable 1
+echo powersave >/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null
+
+eips -c
+eips 2 4 "Calendar: waiting for Wi-Fi ..."
+
+wait_wifi() {
+    i=0
+    while ! ping -c 1 -W 2 "$WIFI_TEST_IP" >/dev/null 2>&1; do
+        i=$((i + 1))
+        [ $i -ge 45 ] && return 1
+        sleep 2
+    done
+    return 0
+}
+
+# Download with the stock wget; fall back to the bundled static `xh` (modern TLS) for https hosts.
+fetch_image() {
+    out="$1"
+    url="${IMAGE_URL}?t=$(date +%s)"
+    if wget -q -T 30 -O "$out" "$url" 2>>"$LOG"; then
+        return 0
+    fi
+    if [ -x "$DIR/bin/xh" ]; then
+        log "wget failed, trying xh"
+        "$DIR/bin/xh" -q -d -o "$out" --timeout 30 get "$url" 2>>"$LOG" && return 0
+    fi
+    return 1
+}
+
+# one-time capability probe, useful when moving the image to an https host
+if wget -q -T 20 -O /dev/null "https://github.com/" 2>>"$LOG"; then
+    log "https probe: OK"
+else
+    log "https probe: FAILED (use http:// image url)"
+fi
+
+last=""
+fails=0
+while true; do
+    if ! wait_wifi; then
+        log "no Wi-Fi (cannot ping $WIFI_TEST_IP), toggling radio"
+        lipc-set-prop com.lab126.cmd wirelessEnable 0
+        sleep 5
+        lipc-set-prop com.lab126.cmd wirelessEnable 1
+        sleep 60
+        continue
+    fi
+
+    if fetch_image "$DIR/new.png" && [ -s "$DIR/new.png" ]; then
+        fails=0
+        sum=$(md5sum "$DIR/new.png" | cut -d' ' -f1)
+        if [ "$sum" != "$last" ]; then
+            mv "$DIR/new.png" "$DIR/dash.png"
+            eips -f -g "$DIR/dash.png"
+            last="$sum"
+            log "updated screen ($sum)"
+        else
+            rm -f "$DIR/new.png"
+            log "no change"
+        fi
+    else
+        fails=$((fails + 1))
+        rm -f "$DIR/new.png"
+        log "fetch failed ($fails)"
+        if [ $fails -ge 3 ] && [ -f "$DIR/dash.png" ]; then
+            # tiny corner marker so you can see it is stale
+            eips 0 39 "offline $(date '+%H:%M')"
+        fi
+    fi
+
+    sleep $((INTERVAL * 60))
+done
