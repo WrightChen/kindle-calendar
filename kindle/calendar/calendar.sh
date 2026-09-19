@@ -15,6 +15,7 @@ log "=== calendar.sh starting (mode $MODE, suspend $SUSPEND, uptime $(cut -d' ' 
 
 # Take over the screen: stop the Kindle UI, keep the device awake, keep Wi-Fi on.
 take_over_screen() {
+    stop framework >/dev/null 2>&1
     /etc/init.d/framework stop >/dev/null 2>&1
     initctl stop webreader >/dev/null 2>&1
     lipc-set-prop com.lab126.powerd preventScreenSaver 1
@@ -85,7 +86,8 @@ deep_sleep() {
     secs=$1
     target=$(( $(date -u +%s) + secs ))
     log "sleeping ${secs}s (wake $(date -u -d @$(( target + 8 * 3600 )) '+%H:%M' 2>/dev/null) Beijing)"
-    lipc-set-prop com.lab126.cmd wirelessEnable 0
+    # NOTE: never turn Wi-Fi off here. On this firmware disabling wireless with the UI stopped
+    # brings the Kindle UI back (observed twice). Wi-Fi stays on; idle draw is still small.
     sync
     sleep 3
 
@@ -120,7 +122,6 @@ deep_sleep() {
     log "wake time reached"
     early_wakes=0
     lipc-set-prop com.lab126.cmd wirelessEnable 1
-    sleep 8
 }
 
 last=""
@@ -128,9 +129,7 @@ fails=0
 while true; do
     ok=0
     if ! wait_wifi; then
-        log "no Wi-Fi (cannot ping $WIFI_TEST_IP), toggling radio"
-        lipc-set-prop com.lab126.cmd wirelessEnable 0
-        sleep 5
+        log "no Wi-Fi (cannot ping $WIFI_TEST_IP), re-asserting radio on"
         lipc-set-prop com.lab126.cmd wirelessEnable 1
         if [ "$MODE" = "battery" ]; then
             deep_sleep $((RETRY_MINUTES * 60))
