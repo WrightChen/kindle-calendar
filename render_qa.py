@@ -40,8 +40,16 @@ def wrap_cjk(draw: ImageDraw.ImageDraw, s: str, f: ImageFont.FreeTypeFont, maxw:
     return lines
 
 
+def load_entries() -> list[dict]:
+    """All daily*.json files in the project folder, concatenated (so the bank can grow in themed files)."""
+    entries: list[dict] = []
+    for p in sorted(HERE.glob("daily*.json")):
+        entries += json.loads(p.read_text(encoding="utf-8"))
+    return entries
+
+
 def pick_entry(today: dt.date) -> dict:
-    entries = json.loads(DAILY.read_text(encoding="utf-8"))
+    entries = load_entries()
     # deterministic per day, but shuffled so consecutive days do not walk the file in order
     h = int(hashlib.sha1(today.isoformat().encode()).hexdigest(), 16)
     return entries[h % len(entries)]
