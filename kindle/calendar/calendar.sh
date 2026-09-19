@@ -54,20 +54,57 @@ else
     log "https probe: FAILED (use http:// image url)"
 fi
 
+# seconds from now until the next HH:MM in WAKE_TIMES (Beijing = UTC+8, pure arithmetic, busybox-safe)
+secs_until_next_wake() {
+    now=$(date -u +%s)
+    day_sec=$(( (now + 8 * 3600) % 86400 ))
+    best=86400
+    for t in $WAKE_TIMES; do
+        h=$(echo "${t%%:*}" | sed 's/^0*//'); m=$(echo "${t##*:}" | sed 's/^0*//')
+        [ -z "$h" ] && h=0; [ -z "$m" ] && m=0
+        target=$(( h * 3600 + m * 60 ))
+        d=$(( target - day_sec ))
+        [ $d -le 60 ] && d=$(( d + 86400 ))
+        [ $d -lt $best ] && best=$d
+    done
+    echo $best
+}
+
+# suspend to RAM, RTC alarm wakes us after $1 seconds; screen keeps its image
+deep_sleep() {
+    secs=$1
+    log "sleeping ${secs}s (wake $(date -u -d @$(( $(date -u +%s) + secs + 8 * 3600 )) '+%H:%M' 2>/dev/null) Beijing)"
+    lipc-set-prop com.lab126.cmd wirelessEnable 0
+    sync
+    sleep 3
+    lipc-set-prop -i com.lab126.powerd rtcWakeup "$secs"
+    echo mem >/sys/power/state
+    # --- resumes here after the RTC alarm (or a power-button press) ---
+    log "woke up"
+    lipc-set-prop com.lab126.cmd wirelessEnable 1
+    sleep 8
+}
+
 last=""
 fails=0
 while true; do
+    ok=0
     if ! wait_wifi; then
         log "no Wi-Fi (cannot ping $WIFI_TEST_IP), toggling radio"
         lipc-set-prop com.lab126.cmd wirelessEnable 0
         sleep 5
         lipc-set-prop com.lab126.cmd wirelessEnable 1
-        sleep 60
+        if [ "$MODE" = "battery" ]; then
+            deep_sleep $((RETRY_MINUTES * 60))
+        else
+            sleep 60
+        fi
         continue
     fi
 
     if fetch_image "$DIR/new.png" && [ -s "$DIR/new.png" ]; then
         fails=0
+        ok=1
         sum=$(md5sum "$DIR/new.png" | cut -d' ' -f1)
         if [ "$sum" != "$last" ]; then
             mv "$DIR/new.png" "$DIR/dash.png"
@@ -88,5 +125,13 @@ while true; do
         fi
     fi
 
-    sleep $((INTERVAL * 60))
+    if [ "$MODE" = "battery" ]; then
+        if [ $ok -eq 1 ]; then
+            deep_sleep "$(secs_until_next_wake)"
+        else
+            deep_sleep $((RETRY_MINUTES * 60))
+        fi
+    else
+        sleep $((INTERVAL * 60))
+    fi
 done

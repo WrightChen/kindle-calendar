@@ -38,7 +38,7 @@ jobs:
           mkdir -p fonts
           curl -fsSL -o fonts/NotoSansCJKsc-Regular.otf https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf
           curl -fsSL -o fonts/NotoSansCJKsc-Bold.otf    https://github.com/notofonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Bold.otf
-      - run: python render.py --out site/calendar.png
+      - run: python render_qa.py --out site/calendar.png && python render.py --out site/month.png
       - run: cp site/calendar.png site/index.png && printf '<img src="calendar.png">' > site/index.html
       - name: Keepalive commit (once every 30 days)
         if: github.event_name == 'schedule'

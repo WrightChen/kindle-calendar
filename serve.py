@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
 import subprocess
 import sys
 import threading
@@ -32,8 +33,9 @@ def ensure_fresh() -> None:
             or (now - _last_render) > dt.timedelta(hours=1)
         )
         if stale:
-            subprocess.run([sys.executable, str(HERE / "render.py"), "--out", str(OUT)], check=True,
-                           env={"PYTHONIOENCODING": "utf-8", **__import__("os").environ})
+            script = "render_qa.py" if os.environ.get("STYLE", "qa") == "qa" else "render.py"
+            subprocess.run([sys.executable, str(HERE / script), "--out", str(OUT)], check=True,
+                           env={"PYTHONIOENCODING": "utf-8", **os.environ})
             _last_render = now
 
 
