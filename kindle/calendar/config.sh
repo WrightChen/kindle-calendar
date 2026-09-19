@@ -13,7 +13,7 @@ WAKE_TIMES="00:40 07:00"
 # SUSPEND=1 tries real suspend-to-RAM between wakes (best battery); after 3 early wakes
 # the script gives up on it for that cycle and just idles with Wi-Fi off.
 # SUSPEND=0 never suspends: always idle awake with Wi-Fi off (safe, ~2-3 days per charge).
-SUSPEND=1
+SUSPEND=0
 INTERVAL=15
 # if a fetch fails in battery mode, retry after this many minutes
 RETRY_MINUTES=30
