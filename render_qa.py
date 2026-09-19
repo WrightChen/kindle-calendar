@@ -100,32 +100,53 @@ def render(today: dt.date, now: dt.datetime) -> Image.Image:
     y = 490
     dr.line((W / 2 - 40, y, W / 2 + 40, y), fill=BLACK, width=3)
 
-    # ---- question + answer, vertically centred in the lower half ----
     entry = pick_entry(today)
     maxw = W - 2 * MARGIN - 24
-    f_q = font(42, bold=True)
-    f_a = font(28)
-    f_b = font(22)
-    q_lines = wrap_cjk(dr, entry["q"], f_q, maxw)[:4]
-    a_lines = wrap_cjk(dr, entry["a"], f_a, maxw)
-    max_lines = 9
-    if len(a_lines) > max_lines:
-        a_lines = a_lines[:max_lines]
-        a_lines[-1] = a_lines[-1][:-1] + "…"
-    block_h = len(q_lines) * 60 + 34 + len(a_lines) * 46 + 40
     top, bottom = 520, H - 90
-    y = top + max(0, (bottom - top - block_h) // 2)
+    if "quote" in entry:
+        # ---- book excerpt card: big quote, book / author, where it came from ----
+        f_qt = font(34, bold=True)
+        f_meta = font(24)
+        f_src = font(20)
+        lines = wrap_cjk(dr, entry["quote"], f_qt, maxw)
+        if len(lines) > 8:
+            lines = lines[:8]
+            lines[-1] = lines[-1][:-1] + "…"
+        block_h = len(lines) * 52 + 40 + 36 + 30
+        y = top + max(0, (bottom - top - block_h) // 2)
+        for ln in lines:
+            dr.text(((W - text_w(dr, ln, f_qt)) / 2, y), ln, font=f_qt, fill=BLACK)
+            y += 52
+        y += 30
+        meta = f"《{entry['book']}》 {entry.get('author', '')}".strip()
+        dr.text(((W - text_w(dr, meta, f_meta)) / 2, y), meta, font=f_meta, fill=DARK)
+        y += 40
+        src = f"微信读书 · {entry.get('src', '')}".rstrip(" ·")
+        dr.text(((W - text_w(dr, src, f_src)) / 2, y), src, font=f_src, fill=MID)
+    else:
+        # ---- question + answer, vertically centred in the lower half ----
+        f_q = font(42, bold=True)
+        f_a = font(28)
+        f_b = font(22)
+        q_lines = wrap_cjk(dr, entry["q"], f_q, maxw)[:4]
+        a_lines = wrap_cjk(dr, entry["a"], f_a, maxw)
+        max_lines = 9
+        if len(a_lines) > max_lines:
+            a_lines = a_lines[:max_lines]
+            a_lines[-1] = a_lines[-1][:-1] + "…"
+        block_h = len(q_lines) * 60 + 34 + len(a_lines) * 46 + 40
+        y = top + max(0, (bottom - top - block_h) // 2)
 
-    for ln in q_lines:
-        dr.text(((W - text_w(dr, ln, f_q)) / 2, y), ln, font=f_q, fill=BLACK)
-        y += 60
-    y += 34
-    for ln in a_lines:
-        dr.text(((W - text_w(dr, ln, f_a)) / 2, y), ln, font=f_a, fill=DARK)
-        y += 46
-    by = f"—— {entry.get('by', '')}".strip()
-    if len(by) > 3:
-        dr.text((W - MARGIN - 12 - text_w(dr, by, f_b), y + 8), by, font=f_b, fill=MID)
+        for ln in q_lines:
+            dr.text(((W - text_w(dr, ln, f_q)) / 2, y), ln, font=f_q, fill=BLACK)
+            y += 60
+        y += 34
+        for ln in a_lines:
+            dr.text(((W - text_w(dr, ln, f_a)) / 2, y), ln, font=f_a, fill=DARK)
+            y += 46
+        by = f"—— {entry.get('by', '')}".strip()
+        if len(by) > 3:
+            dr.text((W - MARGIN - 12 - text_w(dr, by, f_b), y + 8), by, font=f_b, fill=MID)
 
     # ---- footer ----
     doy = today.timetuple().tm_yday
