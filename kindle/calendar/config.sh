@@ -1,7 +1,9 @@
 # Calendar dashboard settings (sourced by calendar.sh). Unix line endings!
 
 # Where to fetch the 758x1024 grayscale PNG from.
-IMAGE_URL="http://192.168.1.18:8765/calendar.png"
+IMAGE_URL="https://wrightchen.github.io/kindle-calendar/calendar.png"
+# LAN fallback while GitHub Pages is not up yet:
+# IMAGE_URL="http://192.168.1.18:8765/calendar.png"
 
 # MODE=battery : wake from deep sleep only at WAKE_TIMES (Beijing time), fetch, redraw, sleep again.
 #                Screen keeps the image while asleep. Wi-Fi is off in between. Weeks per charge.
