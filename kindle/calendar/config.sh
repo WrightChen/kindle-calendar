@@ -9,7 +9,7 @@ IMAGE_URL="https://wrightchen.github.io/kindle-calendar/calendar.png"
 #                Screen keeps the image while asleep. Wi-Fi is off in between. Weeks per charge.
 # MODE=powered : stay awake, fetch every INTERVAL minutes. Use when plugged in.
 MODE=battery
-WAKE_TIMES="00:40 07:00"
+WAKE_TIMES="00:05 07:00"
 # SUSPEND=1 tries real suspend-to-RAM between wakes (best battery); after 3 early wakes
 # the script gives up on it for that cycle and just idles with Wi-Fi off.
 # SUSPEND=0 never suspends: always idle awake with Wi-Fi off (safe, ~2-3 days per charge).

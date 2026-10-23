@@ -153,9 +153,10 @@ def render(today: dt.date, now: dt.datetime) -> Image.Image:
     foot = f"第 {today.isocalendar()[1]} 周 · 今年第 {doy} 天"
     f_f = font(20)
     dr.text((MARGIN, H - 44), foot, font=f_f, fill=MID)
-    upd = f"更新 {now.strftime('%m-%d %H:%M')}"
-    f_u = font(16)
-    dr.text((W - MARGIN - text_w(dr, upd, f_u), H - 40), upd, font=f_u, fill=LIGHT)
+    if today == now.date():  # pre-rendered future days carry no render timestamp
+        upd = f"更新 {now.strftime('%m-%d %H:%M')}"
+        f_u = font(16)
+        dr.text((W - MARGIN - text_w(dr, upd, f_u), H - 40), upd, font=f_u, fill=LIGHT)
     return img
 
 

@@ -30,7 +30,7 @@ secs_until_next_wake() {
 }
 
 fetch_image() {
-    out="$1"; url="${IMAGE_URL}?t=$(date +%s)"
+    out="$1"; url="$2?t=$(date +%s)"
     wget -q -T 30 -O "$out" "$url" 2>>"$LOG" && return 0
     [ -x "$DIR/bin/xh" ] && "$DIR/bin/xh" -q -d -o "$out" --timeout 30 get "$url" 2>>"$LOG" && return 0
     return 1
@@ -71,9 +71,20 @@ update() {
     lipc-set-prop -i com.lab126.powerd deferSuspend 120000 >/dev/null 2>&1
     was_wifi=$(lipc-get-prop com.lab126.cmd wirelessEnable 2>/dev/null)
     [ "$was_wifi" = "1" ] || lipc-set-prop com.lab126.cmd wirelessEnable 1
+    today=$(beijing_date)
+    day_url="${IMAGE_URL%/*}/d/$today.png"
+    got=""
     if ! wait_wifi; then
         log "update: no Wi-Fi"
-    elif fetch_image "$DIR/new.png" && [ -s "$DIR/new.png" ]; then
+    elif fetch_image "$DIR/new.png" "$day_url" && [ -s "$DIR/new.png" ]; then
+        got=dated
+    elif fetch_image "$DIR/new.png" "$IMAGE_URL" && [ -s "$DIR/new.png" ]; then
+        got=fallback
+        log "update: no pre-rendered image for $today, used calendar.png (will retry)"
+    else
+        log "update: fetch failed"
+    fi
+    if [ -n "$got" ]; then
         sum=$(md5sum "$DIR/new.png" | cut -d' ' -f1)
         old=$(md5sum "$DIR/dash.png" 2>/dev/null | cut -d' ' -f1)
         mv "$DIR/new.png" "$DIR/dash.png"
@@ -83,11 +94,10 @@ update() {
         else
             log "update: image unchanged"
         fi
-        beijing_date >"$STAMP"
-    else
-        rm -f "$DIR/new.png"
-        log "update: fetch failed"
+        # only the image made for today's date counts as done; otherwise keep retrying
+        [ "$got" = dated ] && echo "$today" >"$STAMP" && log "update: $today OK"
     fi
+    rm -f "$DIR/new.png"
     # restore the radio state the user had (off when it was off)
     [ "$was_wifi" = "1" ] || lipc-set-prop com.lab126.cmd wirelessEnable 0
     log "update: done"
@@ -103,6 +113,8 @@ lipc-wait-event -m com.lab126.powerd goingToScreenSaver,wakeupFromSuspend,readyT
     case "$ev" in
         readyToSuspend*)
             secs=$(secs_until_next_wake)
+            # still showing an old day (e.g. Wi-Fi was down): retry within the hour
+            if stale && [ "$secs" -gt 3600 ]; then secs=3600; fi
             lipc-set-prop -i com.lab126.powerd rtcWakeup "$secs" 2>>"$LOG"
             log "readyToSuspend: RTC alarm in ${secs}s"
             ;;
