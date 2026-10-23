@@ -42,3 +42,9 @@ python serve.py --port 8765                         # 局域网服务
 - 法定假日「休/班」标记依赖 `chinesecalendar` 包，国务院每年 11-12 月公布下一年安排后要升级该包，否则下一年不显示休/班。
 - 脚本运行期间 Kindle 不能当阅读器用，重启即恢复。
 - 设计为插电常显。不插电时 Wi-Fi 常开，大约撑 1～2 天。
+
+## 内容轮换
+
+- 内容库是所有 `daily*.json` 的合集。问答条目字段 `q/a/by/tag`，金句条目字段 `quote/book/author/src/tag/marks`（`marks` 为微信读书划线人数）。
+- `schedule.py` 维护 `schedule.json`：每天从本轮没出现过的条目里挑一条，全部用完才开始下一轮，且尽量不连续两天同一类。新加的条目自动进入候选池，已经排好的日期不变。
+- 云端每次运行把未来 14 天渲染成 `site/d/YYYY-MM-DD.png`，Kindle 按自己的日期去取，不受 GitHub 定时任务延迟影响。

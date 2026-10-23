@@ -49,8 +49,12 @@ def load_entries() -> list[dict]:
 
 
 def pick_entry(today: dt.date) -> dict:
+    # schedule.json (see schedule.py) gives a no-repeat rotation; dates outside it fall back to a hash pick
+    from schedule import lookup
+    e = lookup(today)
+    if e is not None:
+        return e
     entries = load_entries()
-    # deterministic per day, but shuffled so consecutive days do not walk the file in order
     h = int(hashlib.sha1(today.isoformat().encode()).hexdigest(), 16)
     return entries[h % len(entries)]
 
@@ -121,7 +125,12 @@ def render(today: dt.date, now: dt.datetime) -> Image.Image:
         meta = f"《{entry['book']}》 {entry.get('author', '')}".strip()
         dr.text(((W - text_w(dr, meta, f_meta)) / 2, y), meta, font=f_meta, fill=DARK)
         y += 40
-        src = f"微信读书 · {entry.get('src', '')}".rstrip(" ·")
+        marks = entry.get("marks")
+        if marks:
+            n = f"{marks / 10000:.1f} 万" if marks >= 10000 else str(marks)
+            src = f"微信读书 · {n.replace('.0 万', ' 万')} 人划线"
+        else:
+            src = f"微信读书 · {entry.get('src', '')}".rstrip(" ·")
         dr.text(((W - text_w(dr, src, f_src)) / 2, y), src, font=f_src, fill=MID)
     else:
         # ---- question + answer, vertically centred in the lower half ----
